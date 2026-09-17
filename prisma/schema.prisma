@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// SQLite does not support native enums and Json in this configuration, so use strings.
+
+// role: owner | member
+// field type: short_text | long_text | number | single_select | multi_select | rating | date | url | image | file | checkbox
+// visibility: group | private
+// status: published | archived
+// reaction type: helpful | saved | wanna_go | checked | experienced
+// activity action: created | edited | file_added | tag_changed | archived | commented
+// notification type: invite | comment | mention | memo_update
+// attachment kind: image | pdf
+
+model User {
+  id             String          @id
+  name           String
+  email          String          @unique
+  password       String
+  avatarUrl      String?
+  groupsOwned    Group[]         @relation("GroupOwner")
+  memberships     GroupMember[]
+  templatesCreated Template[]
+  memosCreated   Memo[]          @relation("MemoCreator")
+  comments       Comment[]
+  activityLogs   ActivityLog[]
+  reactions      Reaction[]
+  favorites      Favorite[]
+}
+
+model Group {
+  id          String         @id
+  name        String
+  description String
+  icon        String
+  color       String
+  ownerId     String
+  owner       User           @relation(fields: [ownerId], references: [id], name: "GroupOwner")
+  members     GroupMember[]
+  templates   Template[]
+  memos       Memo[]
+  tags        Tag[]
+  createdAt   DateTime
+  inviteCode  String
+}
+
+model GroupMember {
+  groupId  String
+  userId   String
+  role     String
+  joinedAt DateTime
+  group    Group @relation(fields: [groupId], references: [id])
+  user     User  @relation(fields: [userId], references: [id])
+
+  @@id([groupId, userId])
+}
+
+model Template {
+  id         String          @id
+  groupId    String
+  name       String
+  description String
+  icon       String
+  createdBy  String
+  createdAt  DateTime
+  fields     TemplateField[]
+  group      Group           @relation(fields: [groupId], references: [id])
+  creator    User            @relation(fields: [createdBy], references: [id])
+  memos      Memo[]
+}
+
+model TemplateField {
+  id           String    @id
+  templateId   String
+  name         String
+  description  String?
+  type         String
+  options      String?
+  required     Boolean
+  visibleInList Boolean
+  searchable   Boolean
+  filterable   Boolean
+  sortOrder    Int
+  template     Template  @relation(fields: [templateId], references: [id])
+}
+
+model Tag {
+  id      String @id
+  groupId String
+  name    String
+  color   String
+  group   Group  @relation(fields: [groupId], references: [id])
+  memoTags MemoTag[]
+}
+
+model Memo {
+  id          String          @id
+  groupId     String
+  templateId  String
+  title       String
+  values      String
+  createdBy   String
+  visibility  String
+  status      String
+  viewCount   Int
+  createdAt   DateTime
+  updatedAt   DateTime
+  attachments Attachment[]
+  reactions   Reaction[]
+  comments    Comment[]
+  activity    ActivityLog[]
+  tags        MemoTag[]
+  favorites   Favorite[]
+  notifications Notification[]
+  group       Group           @relation(fields: [groupId], references: [id])
+  template    Template        @relation(fields: [templateId], references: [id])
+  creator     User            @relation(fields: [createdBy], references: [id], name: "MemoCreator")
+}
+
+model MemoTag {
+  memoId String
+  tagId  String
+  memo   Memo @relation(fields: [memoId], references: [id])
+  tag    Tag  @relation(fields: [tagId], references: [id])
+
+  @@id([memoId, tagId])
+}
+
+model Attachment {
+  id     String         @id
+  memoId String
+  kind   String
+  name   String
+  url    String
+  size   Int
+  memo   Memo           @relation(fields: [memoId], references: [id])
+}
+
+model Reaction {
+  id     String        @id
+  memoId String
+  userId String
+  type   String
+  memo   Memo          @relation(fields: [memoId], references: [id])
+  user   User          @relation(fields: [userId], references: [id])
+}
+
+model Comment {
+  id        String   @id
+  memoId    String
+  userId    String
+  body      String
+  createdAt DateTime
+  memo      Memo     @relation(fields: [memoId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model ActivityLog {
+  id        String         @id
+  memoId    String
+  userId    String
+  action    String
+  detail    String
+  createdAt DateTime
+  memo      Memo           @relation(fields: [memoId], references: [id])
+  user      User           @relation(fields: [userId], references: [id])
+}
+
+model Favorite {
+  memoId String
+  userId String
+  memo   Memo @relation(fields: [memoId], references: [id])
+  user   User @relation(fields: [userId], references: [id])
+
+  @@id([memoId, userId])
+}
+
+model Notification {
+  id        String   @id
+  type      String
+  title     String
+  body      String
+  createdAt DateTime
+  read      Boolean
+  memoId    String?
+  memo      Memo?    @relation(fields: [memoId], references: [id])
+}
